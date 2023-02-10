@@ -1,2 +1,2 @@
-# RealDigital_hardware_code
+# RealDigital_hardware
 Programming modules for the RealDigital oscilloscope hardware
