@@ -8,39 +8,53 @@ int main(void) {
 	uint32_t *samplep = (uint32_t *) Sample_Data;
 	uint32_t *triggerp = (uint32_t *) BTN_Data;
 	//32k sample array
-	uint32_t *sample_arr = (uint32_t *) malloc(32000*sizeof(uint32_t));
+	uint32_t *sample_arr = (uint32_t *) malloc(500*sizeof(uint32_t));
 
 	//32k time of sample array
-	//uint32_t time_arr[32000];
+	double *time_arr = (double *) malloc (500*sizeof(double));
+
+	//get pointer to processor global time
+	XTime* processor_time = (XTime *) malloc (sizeof(XTime));
+	XTime_GetTime(processor_time);
+
+	//configure UART
+	configure_uart1();
 
 	//continuous loop
 	for (;;) {
 		//check for trigger (btn0 is pressed)
 		if((*triggerp & 1) == 1) {
+			//initialize start time
+			XTime_SetTime(0x0000000000000000);
+
 			//store 32k samples and times to memory
-			for (int i = 0; i < 32000; i++) {
+			for (int i = 0; i < 500; i++) {
 				sample_arr[i] = *samplep;
-				//time_arr[i] = ;
+				time_arr[i] = get_sample_time(processor_time);
 			}
 
 			//send sample data to host computer over uart
-			save_sample(sample_arr);
+			save_sample(time_arr, sample_arr);
 
 		}
 	}
 }
 
+double get_sample_time(XTime* processor_time) {
+	XTime_GetTime(processor_time);
+	return (double) *processor_time;
+}
 
-void save_sample(uint32_t* sample_addr) {
+void save_sample(double* time_addr, uint32_t* sample_addr) {
 	//send file header
 	uart1_sendstr("Time,");
 	uart1_sendchar(' ');
 	uart1_sendstr("Voltage\n");
 	char str[32] = "";
 	//send data line by line
-	for (int i = 0; i < 32000; i++) {
-		//uart1_sendstr(time_addr[i]);
-		//uart1_sendchar(',');
+	for (int i = 0; i < 500; i++) {
+		sprintf( str, "%f,", time_addr[i]);
+		uart1_sendstr(str);
 		sprintf( str, "%" PRIu32 "\n", sample_addr[i]);
 		uart1_sendstr(str);
 	}
@@ -90,8 +104,11 @@ void uart1_sendchar(char data) {
 }
 
 void uart1_sendstr(char buffer[32]) {
-	for (int i = 0; i <= sizeof(*buffer)/sizeof(buffer[0]); i++) {
+	for (int i = 0; i <= 32; i++) {
 		uart1_sendchar(buffer[i]);
+		if (buffer[i] == ',' || buffer[i] == '\n') {
+			return;
+		}
 	}
 
 }
