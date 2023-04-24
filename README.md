@@ -35,3 +35,16 @@ sw3-sw2: Signal Period
 
 sw4: Reset Signal
 Sets the signal output of the FPGA to 0 while sw4 is enabled
+
+Alpha Prototype Directions:
+To connect the device with the SimpleScope web-based application, clone the application's repository and use CoolTerm to connect to the serial COM port. 
+https://github.com/Chi-Cheng-Chuang/Project-Hawk/tree/gfishel
+
+Under the Connection tab in CoolTerm, click options. Navigate to the File Capture settings and disable the "Leave File open while capturing" setting.
+Close settings and click open the Connection tab again. Click on "Capture to Text/Binary File"  then "Start". Navigate to "data.csv" found in the web-based application repository.
+
+Following the directions in the "README.md" file in the web-based application repository, enable the file deletion from root directory then run the server. 
+
+To use the application correctly, click the "reset" button. Next, click btn0 on the RealDigital Blackboard. Finally, wait for LD13 to turn off and click "arm". 
+The application should now display the sample data. 
+Repeat these steps and adjust the switches on the Blackboard as desired. It is not recommended to adjust the slide switches while LD13 is on/
