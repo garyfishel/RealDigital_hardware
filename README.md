@@ -47,4 +47,4 @@ Following the directions in the "README.md" file in the web-based application re
 
 To use the application correctly, click the "reset" button. Next, click btn0 on the RealDigital Blackboard. Finally, wait for LD13 to turn off and click "arm". 
 The application should now display the sample data. 
-Repeat these steps and adjust the switches on the Blackboard as desired. It is not recommended to adjust the slide switches while LD13 is on/
+Repeat these steps and adjust the switches on the Blackboard as desired. It is not recommended to adjust the slide switches while LD13 is on
