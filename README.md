@@ -8,6 +8,9 @@ Verilog source files can be found under Sample_Signal_Generator.srcs
 To run program, create a new platform project in Vitis 2020.2 using the design_1_wrapper.xsa platform. 
 Build the platform
 
+There is a known issue with building the new platform in vitis 2020.2. To fix this issue, see the top response to the following forum post:
+https://support.xilinx.com/s/question/0D52E00006hpOx5SAE/drivers-and-makefiles-problems-in-vitis-20202?language=en_US
+
 Create a new application project with the new platform and copy "Signal_Generator.h" and "Signal_Generator.c" into the src file. 
 Connect a Real Digital Blackboard Rev.D to a usb port on your pc and configure jp3 to "USB" and jp2 to "JTAG".
 Build the project then run. 
