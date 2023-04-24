@@ -21,10 +21,10 @@
 #define BTN_Data 0x43C00004
 
 //returns a double value of the current global processor time
-double get_sample_time(XTime* processor_time);
+float get_sample_time(XTime* processor_time);
 
 //Takes the 32k samples stored in the sample array and saves them into a csv file at fptr
-void save_sample(double* time_addr, uint32_t* sample_addr);
+void save_sample(float* time_addr, uint32_t* sample_addr);
 
 //configures UART1 for 115200 baud, 8-data bits, no parity, 1 stop bit.
 void configure_uart1();

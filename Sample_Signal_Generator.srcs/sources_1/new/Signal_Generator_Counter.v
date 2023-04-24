@@ -8,6 +8,7 @@ module Signal_Generator_Counter (
     
     reg [1:0] counter = 2'b00; //counter to track how many clock cycles have passed since last change of output signal
     reg phase = 0; //variable to track if triangle or sinewave signals are increasing or decreasing
+    reg [9:0] square_counter = 10'b0000000000; //counter to make square wave period last 24 clock cycles
    
     //initialize sine wave LUT
     parameter SIZE = 1024; //number of values in the lookup table   
@@ -30,7 +31,13 @@ module Signal_Generator_Counter (
                             if (sample_signal != 12'd0 && sample_signal != 12'hFFF) //start square wave when waveform_sel is set to 00
                                 sample_signal <= 12'd0; 
                             else
-                                sample_signal <= ~sample_signal; //alternate signal between 000 and FFF to simulate square wave
+                                if (square_counter == 10'b1111111111)
+                                    begin
+                                        sample_signal <= ~sample_signal; //alternate signal between 000 and FFF to simulate square wave
+                                        square_counter <= 3'b000; //reset square_counter
+                                    end
+                                else 
+                                    square_counter <= square_counter + 1;
                         2'b01: //sawtooth wave
                             sample_signal <= sample_signal + 1; //increment the sample_signal value by 1 each clock cycle. The value will reset to 0 with overflow
                         2'b10: //triangle wave

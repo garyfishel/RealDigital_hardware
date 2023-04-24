@@ -8,10 +8,10 @@ int main(void) {
 	uint32_t *samplep = (uint32_t *) Sample_Data;
 	uint32_t *triggerp = (uint32_t *) BTN_Data;
 	//32k sample array
-	uint32_t *sample_arr = (uint32_t *) malloc(500*sizeof(uint32_t));
+	uint32_t *sample_arr = (uint32_t *) malloc(1000*sizeof(uint32_t));
 
 	//32k time of sample array
-	double *time_arr = (double *) malloc (500*sizeof(double));
+	float *time_arr = (float *) malloc (1000*sizeof(float));
 
 	//get pointer to processor global time
 	XTime* processor_time = (XTime *) malloc (sizeof(XTime));
@@ -28,7 +28,7 @@ int main(void) {
 			XTime_SetTime(0x0000000000000000);
 
 			//store 32k samples and times to memory
-			for (int i = 0; i < 500; i++) {
+			for (int i = 0; i < 1000; i++) {
 				sample_arr[i] = *samplep;
 				time_arr[i] = get_sample_time(processor_time);
 			}
@@ -40,19 +40,18 @@ int main(void) {
 	}
 }
 
-double get_sample_time(XTime* processor_time) {
+float get_sample_time(XTime* processor_time) {
 	XTime_GetTime(processor_time);
-	return (double) *processor_time;
+	return ((float) *processor_time) / (COUNTS_PER_SECOND);
 }
 
-void save_sample(double* time_addr, uint32_t* sample_addr) {
+void save_sample(float* time_addr, uint32_t* sample_addr) {
 	//send file header
-	uart1_sendstr("Time,");
-	uart1_sendchar(' ');
-	uart1_sendstr("Voltage\n");
+	uart1_sendstr("t,");
+	uart1_sendstr("data\n");
 	char str[32] = "";
 	//send data line by line
-	for (int i = 0; i < 500; i++) {
+	for (int i = 0; i < 1000; i++) {
 		sprintf( str, "%f,", time_addr[i]);
 		uart1_sendstr(str);
 		sprintf( str, "%" PRIu32 "\n", sample_addr[i]);
