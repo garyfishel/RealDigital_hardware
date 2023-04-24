@@ -52,7 +52,7 @@ void save_sample(float* time_addr, uint32_t* sample_addr) {
 	char str[32] = "";
 	//send data line by line
 	for (int i = 0; i < 1000; i++) {
-		sprintf( str, "%f,", time_addr[i]);
+		sprintf( str, "%e,", time_addr[i]);
 		uart1_sendstr(str);
 		sprintf( str, "%" PRIu32 "\n", sample_addr[i]);
 		uart1_sendstr(str);
