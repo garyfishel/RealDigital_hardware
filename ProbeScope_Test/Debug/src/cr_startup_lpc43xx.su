@@ -1,0 +1,13 @@
+../src/cr_startup_lpc43xx.c:265:6:data_init	40	static
+../src/cr_startup_lpc43xx.c:274:6:bss_init	24	static
+../src/cr_startup_lpc43xx.c:299:6:ResetISR	40	static
+../src/cr_startup_lpc43xx.c:443:6:NMI_Handler	4	static
+../src/cr_startup_lpc43xx.c:448:6:HardFault_Handler	4	static
+../src/cr_startup_lpc43xx.c:453:6:MemManage_Handler	4	static
+../src/cr_startup_lpc43xx.c:458:6:BusFault_Handler	4	static
+../src/cr_startup_lpc43xx.c:463:6:UsageFault_Handler	4	static
+../src/cr_startup_lpc43xx.c:468:6:SVC_Handler	4	static
+../src/cr_startup_lpc43xx.c:473:6:DebugMon_Handler	4	static
+../src/cr_startup_lpc43xx.c:478:6:PendSV_Handler	4	static
+../src/cr_startup_lpc43xx.c:483:6:SysTick_Handler	4	static
+../src/cr_startup_lpc43xx.c:495:6:IntDefaultHandler	4	static
