@@ -3,7 +3,6 @@ struct CircularBuffer {
 	int size; //number of values that can be stored to the buffer array
 	int head; //index of the oldest value in the array
 	int tail; //index of the newest value in the array
-	int isFull; //indicator if the buffer array is full or not
 };
 
 /* allocate an array of size 'size' into memory
