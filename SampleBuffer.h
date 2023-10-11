@@ -9,7 +9,6 @@ struct CircularBuffer {
  * set the size of the buffer
  * set head to the first index in the array
  * set tail to the first index in the array
- * set isFull to 0 (false)
  */
 void cBufferInit(struct CircularBuffer* cBuffer, int size);
 
