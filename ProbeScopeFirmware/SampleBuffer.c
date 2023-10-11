@@ -6,7 +6,6 @@ void cBufferInit(struct CircularBuffer* cBuffer, int size) {
 	cBuffer->size = size;
 	cBuffer->head = 0;
 	cBuffer->tail = 0;
-	cBuffer->isFull = 0;
 }
 
 void addToBuffer(struct CircularBuffer* cBuffer, uint32_t data) {
