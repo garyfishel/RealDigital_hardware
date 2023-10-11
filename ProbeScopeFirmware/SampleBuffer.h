@@ -1,3 +1,6 @@
+#include <stdlib.h>
+#include <stdint.h>
+
 struct CircularBuffer {
 	uint32_t* buffer;
 	int size; //number of values that can be stored to the buffer array
