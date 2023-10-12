@@ -23,11 +23,11 @@
 #include "task.h"
 #include "timers.h"
 #include "StackMacros.h"
+#include "SampleBuffer.h"
 
-//pointer to sample buffer
-uint32_t* sampleBuffer;
+struct CircularBuffer* Buffer;
 
-/* The default example uses DMA. To use the example in an interrutp based
+/* The default example uses DMA. To use the example in an interrupt based
    configuration, enable the following definition. */
 #define USE_INTERRUPT_MODE
 
@@ -42,8 +42,8 @@ uint32_t* sampleBuffer;
 static const CHIP_CGU_CLKIN_T adcBaseClkSources[] = {
 	CLKIN_IRC,			/* Usually 12MHz */
 	CLKIN_CLKIN,		/* External clock in rate */
-	CLKIN_CRYSTAL,	/* Usually 12MHz */
-	CLKIN_AUDIOPLL,	/* Unknown, will be 0 if not configured */
+	CLKIN_CRYSTAL,		/* Usually 12MHz */
+	CLKIN_AUDIOPLL,		/* Unknown, will be 0 if not configured */
 	CLKIN_MAINPLL		/* Usually 204MHz, may be too fast to use with a divider */
 };
 
@@ -285,15 +285,11 @@ static void setupHardware() {
 	SystemCoreClockUpdate();
 
 	//initialize USB
-	Chip_USB0_Init();
+	//Chip_USB0_Init();
 
 	setupADC();
 
-	//set up sample buffer
-	//32000 4 byte memory locations
-	//each 4 byte location will store 2 12-bit values
-	sampleBuffer = (uint32_t*) 0x10000000;
-	i = 0;
+	cBufferInit(Buffer, 32000);
 
 }
 
@@ -301,9 +297,11 @@ static void setupHardware() {
 static void getSample() {
 
 	if (i < 32000) {
-		sampleBuffer[i] = lastSample[0];
+		addToBuffer(Buffer, lastSample[0]);
 		i++;
 	}
+
+	while(1) {}
 
 }
 
@@ -311,9 +309,6 @@ static void getSample() {
 
 
 //Receive USB commands from host pc
-
-
-
 
 
 
