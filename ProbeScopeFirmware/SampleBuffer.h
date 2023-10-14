@@ -5,7 +5,6 @@ struct CircularBuffer {
 	uint32_t* buffer;
 	uint32_t size; //number of values that can be stored to the buffer array
 	uint32_t head; //index of the oldest value in the array
-	uint32_t tail; //index of the newest value in the array
 };
 
 

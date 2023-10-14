@@ -44,7 +44,7 @@ int main(void) {
 
     // TODO: insert code here
 
-    samples = malloc(sizeof(struct CircularBuffer));
+    samples = (struct CircularBuffer*) malloc(sizeof(struct CircularBuffer));
 
     cBufferInit(samples, 32000);
 
