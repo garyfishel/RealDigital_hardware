@@ -1,9 +1,10 @@
 #include "SampleBuffer.h"
 
+
 //initialize the buffer array with size size
 void cBufferInit(struct CircularBuffer* cBuffer, int size) {
 	cBuffer->buffer = (uint32_t*) malloc(size*sizeof(uint32_t));
-	cBuffer->size = size;
+	cBuffer->size = (uint32_t) size;
 	cBuffer->head = 0;
 	cBuffer->tail = 0;
 }
@@ -11,7 +12,7 @@ void cBufferInit(struct CircularBuffer* cBuffer, int size) {
 void addToBuffer(struct CircularBuffer* cBuffer, uint32_t data) {
 	cBuffer->buffer[cBuffer->head] = data;
 	cBuffer->tail = cBuffer->head;
-	cBuffer->head++;
+	(cBuffer->head)++;
 	if (cBuffer->head>=cBuffer->size)
 		cBuffer->head = 0; //reset to start of array if end is met
 }

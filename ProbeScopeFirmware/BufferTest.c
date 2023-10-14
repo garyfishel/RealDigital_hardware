@@ -22,6 +22,8 @@
 
 // TODO: insert other include files here
 #include "SampleBuffer.h"
+
+struct CircularBuffer* samples;
 // TODO: insert other definitions and declarations here
 
 int main(void) {
@@ -41,7 +43,9 @@ int main(void) {
 #endif
 
     // TODO: insert code here
-    struct CircularBuffer* samples;
+
+    samples = malloc(sizeof(struct CircularBuffer));
+
     cBufferInit(samples, 32000);
 
     for (int i = 0; i< 32000; i++) {
