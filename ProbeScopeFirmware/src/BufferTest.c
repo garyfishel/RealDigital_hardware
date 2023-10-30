@@ -59,6 +59,8 @@ struct CircularBuffer* samples;
 #define PACKET_BUFFER_SIZE 1024//4096
 #define LUSB_DATA_PENDING _BIT(0)
 
+#define DMA_CH 7
+
 static uint8_t g_rxBuff[PACKET_BUFFER_SIZE];
 static uint8_t g_txBuff[8192]; //4096
 static uint8_t g_txBuff1[8192];
@@ -95,8 +97,6 @@ static const CHIP_CGU_CLKIN_T adcBaseClkSources[] = {
 
 uint32_t freqHSADC = 0;
 uint32_t stored_last_0 = 0;
-
-static int i;
 
 /* Last saved ADC sample for each input */
 volatile uint32_t lastSample[6];
@@ -201,88 +201,78 @@ static void setupClock(uint32_t rate)
 	Chip_Clock_EnableOpts(CLK_ADCHS, true, true, 1);
 }
 
-static void timer_setup(void)
-{
-	/* Enable timer 1 clock and reset it */
-	Chip_TIMER_Init(LPC_TIMER1);
-	Chip_RGU_TriggerReset(RGU_TIMER1_RST);
-	while (Chip_RGU_InReset(RGU_TIMER1_RST)) {}
-
-	/* Timer setup for match and interrupt at SAMPLERATE */
-	Chip_TIMER_Reset(LPC_TIMER1);
-	Chip_TIMER_MatchEnableInt(LPC_TIMER1, 1);
-	Chip_TIMER_SetMatch(LPC_TIMER1, 1, (Chip_Clock_GetRate(CLK_MX_TIMER1) / SAMPLERATE));
-	Chip_TIMER_ResetOnMatchEnable(LPC_TIMER1, 1);
-	Chip_TIMER_Enable(LPC_TIMER1);
-
-	/* Enable timer interrupt */
-	NVIC_EnableIRQ(TIMER1_IRQn);
-	NVIC_ClearPendingIRQ(TIMER1_IRQn);
-}
+//static void timer_setup(void)
+//{
+//	/* Enable timer 1 clock and reset it */
+//	Chip_TIMER_Init(LPC_TIMER1);
+//	Chip_RGU_TriggerReset(RGU_TIMER1_RST);
+//	while (Chip_RGU_InReset(RGU_TIMER1_RST)) {}
+//
+//	/* Timer setup for match and interrupt at SAMPLERATE */
+//	Chip_TIMER_Reset(LPC_TIMER1);
+//	Chip_TIMER_MatchEnableInt(LPC_TIMER1, 1);
+//	Chip_TIMER_SetMatch(LPC_TIMER1, 1, (Chip_Clock_GetRate(CLK_MX_TIMER1) / SAMPLERATE));
+//	Chip_TIMER_ResetOnMatchEnable(LPC_TIMER1, 1);
+//	Chip_TIMER_Enable(LPC_TIMER1);
+//
+//	/* Enable timer interrupt */
+//	NVIC_EnableIRQ(TIMER1_IRQn);
+//	NVIC_ClearPendingIRQ(TIMER1_IRQn);
+//}
 
 void setupADC() {
-	/* Setting up the HSADC clock is more complex than other peripherals.
-	   The HSADC clock is driven directly from the CGU/CCU and has limited
-	   source and divider options. Because the HSADC clocking is entirely
-	   handled outside the HSADC peripheral, example code for setting up
-	   the CGU/CCU to get a rough HSADC clock rate is included in this
-	   example. */
+
 	setupClock(HSADC_CLOCK_RATE);
 
-	/* Initialize HSADC */
-	Chip_HSADC_Init(LPC_ADCHS);
+	LPC_ADCHS->INTS[0].CLR_EN   = 0x7F; // disable interrupt 0
 
-	/* Setup FIFO trip points for interrupt/DMA to 8 samples, no packing */
-	Chip_HSADC_SetupFIFO(LPC_ADCHS, 15, true);
+	LPC_ADCHS->INTS[0].CLR_STAT = 0x7F; // clear interrupt status
 
-	/* Software trigger only, 0x90 recovery clocks, add channel IF to FIFO entry */
-	Chip_HSADC_ConfigureTrigger(LPC_ADCHS, HSADC_CONFIG_TRIGGER_SW,
-								HSADC_CONFIG_TRIGGER_RISEEXT, HSADC_CONFIG_TRIGGER_NOEXTSYNC,
-								HSADC_CHANNEL_ID_EN_ADD, 0x90);
+	while(LPC_ADCHS->INTS[0].STATUS & 0x7D); // wait for status to clear, have to exclude FIFO_EMPTY
 
-	/* Select both positive and negative DC biasing for input 3 */
-	//Chip_HSADC_SetACDCBias(LPC_ADCHS, 3, HSADC_CHANNEL_DCBIAS, HSADC_CHANNEL_DCBIAS);
-	Chip_HSADC_SetACDCBias(LPC_ADCHS, 0, HSADC_CHANNEL_DCBIAS, HSADC_CHANNEL_NODCBIAS);
+	LPC_ADCHS->INTS[1].CLR_EN   = 0x7F;
 
-	/* Set low A threshold to 10% and high A threshold to 90% */
-	Chip_HSADC_SetThrLowValue(LPC_ADCHS, 0, ((HSADC_MAX_SAMPLEVAL * 1) / 10));
-	Chip_HSADC_SetThrHighValue(LPC_ADCHS, 0, ((HSADC_MAX_SAMPLEVAL * 9) / 10));
+	LPC_ADCHS->INTS[1].CLR_STAT = 0x7F;
 
-	/* Set low B threshold to 40% and high B threshold to 60% */
-	Chip_HSADC_SetThrLowValue(LPC_ADCHS, 1, ((HSADC_MAX_SAMPLEVAL * 4) / 10));
-	Chip_HSADC_SetThrHighValue(LPC_ADCHS, 1, ((HSADC_MAX_SAMPLEVAL * 6) / 10));
+	while(LPC_ADCHS->INTS[1].STATUS & 0x7D);
 
-	/* Setup data format for 2's complement and update clock settings. This function
-	   should be called whenever a clock change is made to the HSADC */
-	Chip_HSADC_SetPowerSpeed(LPC_ADCHS, false);
+	LPC_ADCHS->POWER_DOWN = 0;
+	LPC_ADCHS->FLUSH = 1;
+    Chip_HSADC_Init(LPC_ADCHS);
 
-	/* Enable HSADC power */
-	Chip_HSADC_EnablePower(LPC_ADCHS);
+    LPC_ADCHS->FIFO_CFG      = (15 << 1) /* FIFO_LEVEL*/
+    						 | (1) /* PACKED_READ*/;
 
-	/* Setup HSADC table 0 descriptors */
-	/* Descriptor entries are mapped as follows */
-	/* 0 : mapped to input 0, branch to next descriptor after sample, match time
-	   is 0x90 clocks for the initial sample (must be greater than or equal to
-		 recovery clocks for auto power-up), test against threshold A */
-	Chip_HSADC_SetupDescEntry(LPC_ADCHS, 0, 0, (HSADC_DESC_CH(0) |
-												HSADC_DESC_HALT | HSADC_DESC_MATCH(0x95) |
-												HSADC_DESC_RESET_TIMER));
+    LPC_ADCHS->DSCR_STS = 1;
 
+    LPC_ADCHS->DESCRIPTOR[0][0] = (1 << 31) /* UPDATE TABLE*/
+    							| (1 << 24) /* RESET_TIMER*/
+								| (0 << 22) /* THRESH*/
+								| (0xA00 << 8) /* MATCH*/
+								| (0x10 << 6) /* BRANCH*/;
 
+    LPC_ADCHS->DESCRIPTOR[1][0] = (1 << 31) /* UPDATE TABLE*/
+    							| (1 << 24) /* RESET_TIMER*/
+								| (0 << 22) /* THRESH*/
+								| (0x01 << 8) /* MATCH*/
+								| (0x01 << 6) /* BRANCH*/;
 
-	/* Setup HSADC interrupts on group 0 - FIFO trip (full), FIFO overrun
-	   error, and descriptor statuses */
-	Chip_HSADC_EnableInts(LPC_ADCHS, 0, ( HSADC_INT0_DSCR_DONE |
-										  HSADC_INT0_DSCR_ERROR));
+    LPC_ADCHS->CONFIG        = (0x90 << 6) /* RECOVERY_TIME*/
+                             | (0 << 5) /* CHANNEL_ID_EN*/
+                             | (0x01) /* TRIGGER_MASK*/;
 
+    uint8_t DGEC = 0xE;
+    LPC_ADCHS->ADC_SPEED     = (DGEC << 16)
+    						 | (DGEC << 12)
+							 | (DGEC << 8)
+							 | (DGEC << 4)
+							 | (DGEC);
 
-
-	/* Enable HSADC interrupts in NVIC */
-	//NVIC_EnableIRQ(ADCHS_IRQn);
-
-	/* Update descriptor tables - needed after updating any descriptors */
-	Chip_HSADC_UpdateDescTable(LPC_ADCHS, 0);
-	Chip_HSADC_UpdateDescTable(LPC_ADCHS, 1);
+    //Didn't set threshold registers as they aren't used
+    LPC_ADCHS->POWER_CONTROL = (1 << 18) /* BGAP*/
+                             | (1 << 17) /* POWER*/
+                             | (1 << 10) /* DC in ADC0*/
+                             | (1 << 4) | (0x4) /* CRS*/;
 
 }
 
@@ -291,15 +281,72 @@ void setupADC() {
 ////////////////////////////////////////////
 
 void setupGPDMA() {
-	GPDMA_init();
+	//GPDMA_init();
+	//GPDMA_InitADV(sample_pointer);
+
+	//Initialize GPDMA
+	Chip_GPDMA_Init(LPC_GPDMA);
+	LPC_GPDMA->CONFIG = 0x01;
+
+	while (!(LPC_GPDMA->CONFIG & 0x01));
+
+	//clear dma interrupt and error flag
+	LPC_GPDMA->INTTCCLEAR = 0xFF;
+	LPC_GPDMA->INTERRCLR = 0xFF;
+
+
+	//set source and destination addresses
+	 LPC_GPDMA->CH[DMA_CH].SRCADDR  =  (uint32_t) &LPC_ADCHS->FIFO_OUTPUT[0];
+	 LPC_GPDMA->CH[DMA_CH].DESTADDR = (uint32_t) sample_pointer;
+
+	 LPC_GPDMA->CH[DMA_CH].CONTROL = 4095
+		| (0x2                << 12)  // src burst size
+		| (0x2                << 15)  // dst burst size
+		| (0x2                << 18)  // src transfer width
+		| (0x2                << 21)  // dst transfer width
+		| (0x1                << 24)  // src AHB master select
+		| (0x0                << 25)  // dst AHB master select
+		| (0x0                << 26)  // src increment: 0, src address not increment after each transfer
+		| (0x1                << 27)  // dst increment: 1, dst address increment after each transfer
+		| (0x1                << 31); // terminal count interrupt enable bit: 1, enabled
+
+	 LPC_GPDMA->CH[DMA_CH].CONFIG   =  (0x1                << 0)   // enable bit: 1 enable, 0 disable
+		| (0x8     			  << 1)   // src peripheral: set to 8   - HSADC
+		| (0x0                << 6)   // dst peripheral: no setting - memory
+		| (0x2                << 11)  // flow control: peripheral to memory - DMA control
+		| (0x1                << 14)  // IE  - interrupt error mask
+		| (0x1                << 15)  // ITC - terminal count interrupt mask
+        | (0x0                << 16)  // lock: when set, this bit enables locked transfer
+		| (0x1                << 18); // Halt: 1, enable DMA requests; 0, ignore further src DMA req
+
+	 LPC_GPDMA->CH[DMA_CH].LLI      =  0;
+
+
 }
 
+
+void startSampling() {
+	Chip_HSADC_SWTrigger(LPC_ADCHS);
+
+    // start DMA
+    LPC_GPDMA->CH[DMA_CH].CONFIG = (0x1 << 0); // enable bit, 1 enable, 0 disable
+
+    for (int j = 0; j < 2; j++) {
+		//wait for transfer to complete
+		while (LPC_GPDMA->INTTCSTAT == 1);
+    }
+
+    Chip_HSADC_FlushFIFO(LPC_ADCHS);
+    uint32_t sts = Chip_HSADC_GetFIFOLevel(LPC_ADCHS);
+    Chip_HSADC_DeInit(LPC_ADCHS);
+    Chip_GPDMA_DeInit(LPC_GPDMA);
+}
 
 ////////////////////////////////////////////
 //USBD ROM Functions
 ////////////////////////////////////////////
 
-/*
+
 static void setupUSB() {
 	libusbdev_init(USB_STACK_MEM_BASE, USB_STACK_MEM_SIZE);
 
@@ -311,7 +358,7 @@ static void setupUSB() {
 
 
 }
-*/
+
 
 
 ////////////////////////////////////////////
@@ -327,43 +374,35 @@ static void setupHardware() {
 	Chip_GPIO_Init(LPC_GPIO_PORT);
 
 	//initialize USB
-	//setupUSB();
+	setupUSB();
 
 	setupADC();
 
-	//samples = (struct CircularBuffer*) malloc(sizeof(struct CircularBuffer));
 
 	sample_pointer = (uint32_t*) malloc(32000*sizeof(uint32_t));
 
 	setupGPDMA();
-	//cBufferInit(samples, 32000);
+
+	startSampling();
 
 }
 
 // Sample Data
 static void getSample() {
-
-	/*
-	if (i < 32000) {
-		//addToBuffer(samples, lastSample[0]);
-
-		i++;
-	}
-	*/
-	GPDMA_ADC2Mtransfer(sample_pointer, 32000);
+	GPDMA_ADC2Mtransfer(sample_pointer, 1);
 }
 
-/*
+
 static void sendSample() {
-	for (i = 0; i < 32000; i++) {
+	for (int i = 0; i < 32000; i++) {
 		while (libusbdev_QueueSendDone() != 0) {
 			//wait for last send to finish
 			__WFI();
 		}
 		//send data point
-		libusbdev_QueueSendReq((uint8_t *) &(samples->buffer[(samples->head + i) % 32000]), 32);
+		libusbdev_QueueSendReq((uint8_t *) &sample_pointer[i], 32);
 	}
-}*/
+}
 
 
 void samplingADC(void) {
@@ -375,48 +414,48 @@ void samplingADC(void) {
 /////////////Interrupt service Handler Functions//////////////////////////
 void TIMER0_IRQHandler(void) //Not Used
 {
-if (Chip_TIMER_MatchPending(LPC_TIMER0, 0)) {
-LPC_TIMER0->IR = TIMER_IR_CLR(0);
-LPC_ADCHS->TRIGGER = 1;
-}
+	if (Chip_TIMER_MatchPending(LPC_TIMER0, 0)) {
+		LPC_TIMER0->IR = TIMER_IR_CLR(0);
+		LPC_ADCHS->TRIGGER = 1;
+	}
 }
 
 void ADCHS_IRQHandler(void) //Not Used
 {
-uint32_t sts;
-// Get ADC interrupt status on group 0 (TEST)
-sts = Chip_HSADC_GetIntStatus(LPC_ADCHS, 0)
-		& Chip_HSADC_GetEnabledInts(LPC_ADCHS, 0);
-// Clear group 0 interrupt statuses
-Chip_HSADC_ClearIntStatus(LPC_ADCHS, 0, sts);
+	uint32_t sts;
+	// Get ADC interrupt status on group 0 (TEST)
+	sts = Chip_HSADC_GetIntStatus(LPC_ADCHS, 0)
+			& Chip_HSADC_GetEnabledInts(LPC_ADCHS, 0);
+	// Clear group 0 interrupt statuses
+	Chip_HSADC_ClearIntStatus(LPC_ADCHS, 0, sts);
 }
 
 void DMA_IRQHandler(void) {
-uint32_t actualLLI;
-static bool on1, on2;
+	uint32_t actualLLI;
+	static bool on1, on2;
 
-if (usbDumpConnected == true) { //If USB is in dump mode
-	actualLLI = LPC_GPDMA->CH[0].LLI; //Look at LLI in order to know what is the previous full USB buffer and send to PC
-	if (actualLLI == (uint32_t) &arrayLLI[0]) {
-		while (libusbdev_QueueSendDone() != 0);
-		while (libusbdev_QueueSendReq(g_txBuff2, 8192) != 0);
+	if (usbDumpConnected == true) { //If USB is in dump mode
+		actualLLI = LPC_GPDMA->CH[0].LLI; //Look at LLI in order to know what is the previous full USB buffer and send to PC
+		if (actualLLI == (uint32_t) &arrayLLI[0]) {
+			while (libusbdev_QueueSendDone() != 0);
+			while (libusbdev_QueueSendReq(g_txBuff2, 8192) != 0);
+		}
+		if (actualLLI == (uint32_t) &arrayLLI[1]) {
+			while (libusbdev_QueueSendDone() != 0);
+			while (libusbdev_QueueSendReq(g_txBuff3, 8192) != 0);
+		}
+		if (actualLLI == (uint32_t) &arrayLLI[2]) {
+			while (libusbdev_QueueSendDone() != 0);
+			while (libusbdev_QueueSendReq(g_txBuff, 8192) != 0);
+		}
+		if (actualLLI == (uint32_t) &arrayLLI[3]) {
+			while (libusbdev_QueueSendDone() != 0);
+			while (libusbdev_QueueSendReq(g_txBuff1, 8192) != 0);
+		}
 	}
-	if (actualLLI == (uint32_t) &arrayLLI[1]) {
-		while (libusbdev_QueueSendDone() != 0);
-		while (libusbdev_QueueSendReq(g_txBuff3, 8192) != 0);
-	}
-	if (actualLLI == (uint32_t) &arrayLLI[2]) {
-		while (libusbdev_QueueSendDone() != 0);
-		while (libusbdev_QueueSendReq(g_txBuff, 8192) != 0);
-	}
-	if (actualLLI == (uint32_t) &arrayLLI[3]) {
-		while (libusbdev_QueueSendDone() != 0);
-		while (libusbdev_QueueSendReq(g_txBuff1, 8192) != 0);
-	}
-}
-LPC_GPDMA->INTTCCLEAR = LPC_GPDMA->INTTCSTAT;
-//GPDMA_capture(&g_txBuff[0], 128); //Restart DMA operation
-//Board_LED_Set(0,true);
+	LPC_GPDMA->INTTCCLEAR = LPC_GPDMA->INTTCSTAT;
+	//GPDMA_capture(&g_txBuff[0], 128); //Restart DMA operation
+	//Board_LED_Set(0,true);
 }
 
 
@@ -442,8 +481,23 @@ int main(void) {
 
     setupHardware();
 
-    samplingADC();
-    getSample();
+    LPC_GPDMA->SYNC = 1;
+
+    while(1) {
+    	if (libusbdev_Connected()) {
+    		if (libusbdev_QueueReadDone() != -1) {//Enter here when receiving data.
+    			//run once mode
+    			if(g_rxBuff[0] == 'r') {
+    				samplingADC();
+    				getSample();
+    				sendSample();
+    			}
+    			//insert other modes here
+
+    		}
+    	}
+    }
+
 
     //sendSample();
     // Force the counter to be placed into memory
