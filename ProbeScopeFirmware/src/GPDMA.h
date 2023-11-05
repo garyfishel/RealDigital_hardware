@@ -98,7 +98,7 @@ void GPDMA_InitADV(uint32_t *dst){
 	while ( !(LPC_GPDMA->CONFIG & 0x01) ); //Wait until GPDMA is enabled
 
 	//GPDMA now is enabled, Next code is to configure channel 0 for ADC dump to memory.
-	LPC_GPDMA->CH[0].SRCADDR = (uint32_t) &(LPC_ADCHS->FIFO_OUTPUT);
+	LPC_GPDMA->CH[0].SRCADDR = (uint32_t) &(LPC_ADCHS->FIFO_OUTPUT[0]);
 	//Source address, ADC FIFO 115 COMPACT ACQUISITION SYSTEM FOR HIGH RESOLUTION RADARS
 	LPC_GPDMA->CH[0].DESTADDR = (uint32_t) dst;
 	//Destination address, variable
@@ -206,13 +206,14 @@ void ADC_DMA_capture(uint32_t *dst, uint32_t samples){
 	LPC_GPDMA->CH[0].DESTADDR = arrayLLI[0].dst;
 	LPC_GPDMA->CH[0].CONTROL = arrayLLI[0].ctrl;
 	LPC_GPDMA->CH[0].LLI = (uint32_t)(&arrayLLI[1]);
-	// must be pointing to the second LLI as the first is used when initializing LPC_GPDMA->CH[0].CONFIG |= (0x1 << 0) | // Channel Enable
 
-	(0x8 << 1) | // Source Peripheral //Ph8 -> ADC read
-	(0x0 << 6) | // Destination Peripheral //Ph0 -> Memory
-	(0x2 << 11) | // Flow Control (P2M DMA control)
-	(0x1 << 14) | // Int error mask
-	(0x1 << 15); // ITC - term count error mask
+	// must be pointing to the second LLI as the first is used when initializing
+	LPC_GPDMA->CH[0].CONFIG |= (0x1 << 0) | // Channel Enable
+							   (0x8 << 1) | // Source Peripheral //Ph8 -> ADC read
+							   (0x0 << 6) | // Destination Peripheral //Ph0 -> Memory
+							   (0x2 << 11) | // Flow Control (P2M DMA control)
+							   (0x1 << 14) | // Int error mask
+							   (0x1 << 15); // ITC - term count error mask
 }
 
 void ADC_DMA_captureUSB(uint32_t *dst0, uint32_t *dst1, uint32_t *dst2, uint32_t *dst3, uint32_t samples){
