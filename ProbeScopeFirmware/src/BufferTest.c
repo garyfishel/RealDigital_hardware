@@ -295,7 +295,7 @@ static void setupHardware()
 
 static void sendSample()
 {
-	for (int i = 0; i < 4094; i++)
+	for (int i = 0; i < 4094; i = i + 64)
 	{
 		while (libusbdev_QueueSendDone() != 0)
 		{
@@ -303,7 +303,7 @@ static void sendSample()
 			__WFI();
 		}
 		//send data point
-		libusbdev_QueueSendReq((uint8_t *) &(samples->buffer[(samples->head + i) % 32000]), 32);
+		libusbdev_QueueSendReq((uint8_t *) (sample_pointer + i), 64);
 	}
 }
 
