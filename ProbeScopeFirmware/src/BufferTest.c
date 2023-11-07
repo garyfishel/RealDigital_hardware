@@ -42,22 +42,10 @@ struct CircularBuffer* samples;
 
 //********** GPDMA definitions and variables **********//
 #include "GPDMA.h"
-
-//#define FREQTIMER0M0 1000
-//#define PACKET_BUFFER_SIZE 1024//4096
-//#define LUSB_DATA_PENDING _BIT(0)
-
 #define DMA_CH 7
-//uint8_t ch_no;
-//#define VADC_DMA_WRITE  7
-//#define VADC_DMA_READ   8
 
-//static uint8_t g_rxBuff[PACKET_BUFFER_SIZE];
-static uint8_t g_txBuff[8192]; //4096
-static uint8_t g_txBuff1[8192];
-static uint8_t g_txBuff2[8192];
-static uint8_t g_txBuff3[8192];
-//volatile uint32_t samplevector[32000];
+static GPDMA_vector DMA_List[8];
+
 volatile uint32_t numsamples = 0;
 volatile bool unhandledReq = false;
 volatile bool usbDumpConnected = false;
@@ -65,18 +53,6 @@ volatile uint8_t pendingChunks = 0;
 volatile uint8_t count = 0;
 
 //********** ADC functions **********//
-/* Base clock lookup table used for finding best HSADC clock rate. Only the
-   base clock sources in this table are used as a possible source for the
-   HSASC peripheral clock before being divided. Add or remove sources as
-   needed, but an exact frequency may not be available unless it's set up
-   on an unused PLL or clock input. */
-static const CHIP_CGU_CLKIN_T adcBaseClkSources[] = {
-	CLKIN_IRC,			/* Usually 12MHz */
-	CLKIN_CLKIN,		/* External clock in rate */
-	CLKIN_CRYSTAL,		/* Usually 12MHz */
-	CLKIN_AUDIOPLL,		/* Unknown, will be 0 if not configured */
-	CLKIN_MAINPLL		/* Usually 204MHz, may be too fast to use with a divider */
-};
 
 /* Periodic sample rate in Hz */
 #define SAMPLERATE (5)
@@ -191,41 +167,40 @@ void setupGPDMA()
 	LPC_GPDMA->CONFIG =   0x01;
 	while( !(LPC_GPDMA->CONFIG & 0x01) );
 
-	for (int i = 0; i < 6; i++) {};
-	// Set source and destination address
-	LPC_GPDMA->CH[DMA_CH].SRCADDR  =  (uint32_t) &LPC_ADCHS->FIFO_OUTPUT[0];
-	LPC_GPDMA->CH[DMA_CH].DESTADDR = sample_pointer;
+	for (int i = 0; i < 8; i++) {
+		    DMA_List[i].SrcAddr = (uint32_t) &LPC_ADCHS->FIFO_OUTPUT[0];
+		    DMA_List[i].DstAddr = (uint32_t) (sample_pointer + 4096*i);
+		    DMA_List[i].NextLLI = (uint32_t)(&DMA_List[(i+1) % 8]);
+		    DMA_List[i].Control = (4095 << 0) |      // Transfersize (does not matter when flow control is handled by peripheral)
+		                           (0x0 << 12)  |          // Source Burst Size
+		                           (0x0 << 15)  |          // Destination Burst Size
+		                           (0x2 << 18)  |          // Source width // 32 bit width
+		                           (0x2 << 21)  |          // Destination width   // 32 bits
+		                           (0x1 << 24)  |          // Source AHB master 0 / 1
+		                           (0x1 << 25)  |          // Dest AHB master 0 / 1
+		                           (0x0 << 26)  |          // Source increment(LAST Sample)
+		                           (0x1 << 27)  |          // Destination increment
+		                           (0x0UL << 31);          // Terminal count interrupt disabled
+	};
 
+	LPC_GPDMA->CH[DMA_CH].SRCADDR  =  DMA_List[0].SrcAddr;
+	LPC_GPDMA->CH[DMA_CH].DESTADDR = DMA_List[0].DstAddr;
+	LPC_GPDMA->CH[DMA_CH].CONTROL = DMA_List[0].Control;
+	LPC_GPDMA->CH[DMA_CH].LLI  = (uint32_t)&(DMA_List[1]);
 
-	//Provide the GPDMA with a linked list to facilitate transfer
-	LPC_GPDMA->CH[DMA_CH].LLI = 0;
-
-	LPC_GPDMA->CH[DMA_CH].CONTROL  = 4094   // transfer size
-								   | (0x0 << 12)  // src burst size // use 2 or 3?
-								   | (0x0 << 15)  // dst burst size // use 2 or 3?
-								   | (0x2 << 18)  // src transfer width
-								   | (0x2 << 21)  // dst transfer width
-								   | (0x1 << 24)  // src AHB master select (24)
-								   | (0x0 << 25)  // dst AHB master select (25)
-								   | (0x0 << 26)  // src increment: 0, src address not increment after each trans
-								   | (0x1 << 27)  // dst increment: 1, dst address     increment after each trans
-								   | (0x1 << 31); // terminal count interrupt enable bit: 1, enabled
-
-	LPC_GPDMA->CH[DMA_CH].CONFIG   = (0x8 << 1)   // src peripheral: set to 8   - HSADC
+	LPC_GPDMA->CH[DMA_CH].CONFIG   = (0x1)		  // enable bit
+								   | (0x8 << 1)   // src peripheral: set to 8   - HSADC
 								   | (0x0 << 6)   // dst peripheral: no setting - memory
-								   | (0x6 << 11)  // flow control: peripheral to memory - DMA control
-								   | (0x2 << 14)  // IE  - interrupt error mask
+								   | (0x2 << 11)  // flow control: peripheral to memory - DMA control
+								   | (0x1 << 14)  // IE  - interrupt error mask
 								   | (0x1 << 15)  // ITC - terminal count interrupt mask
 								   | (0x0 << 16)  // lock: when set, this bit enables locked transfer
 								   | (0x1 << 18); // Halt: 1, enable DMA requests; 0, ignore further src DMA req
 
-//	//Enable Interrupt for DMA
+	//Enable Interrupt for DMA
 	NVIC_SetPriority(DMA_IRQn,0x00);
 	NVIC_ClearPendingIRQ(DMA_IRQn);
 	NVIC_EnableIRQ(DMA_IRQn);
-//
-//	//Enable Channel
-	LPC_GPDMA->CH[DMA_CH].CONFIG |= (0x1 << 0);
 }
 
 void startSampling()
@@ -237,8 +212,8 @@ void startSampling()
 
 	for (int i = 0; i < 8; i++) {
 
-			LPC_GPDMA->CH[DMA_CH].DESTADDR = sample_pointer + 4094*i;
-			GPDMA_ADC2Mtransfer(sample_pointer + 4094*i, 1);
+			LPC_GPDMA->CH[DMA_CH].DESTADDR = sample_pointer + 4095*i;
+			GPDMA_ADC2Mtransfer(sample_pointer + 4095*i, 1);
 
 			//start DMA
 			LPC_GPDMA->CH[DMA_CH].CONFIG = (0x1 << 0); // enable bit, 1 enable, 0 disable
@@ -281,13 +256,13 @@ static void setupHardware()
 	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, 3, 7);
 
 	// Initialize USB
-	setupUSB();
+//	setupUSB();
 
 	// Initialize ADC
 	setupADC();
 
 	//samples = (struct CircularBuffer*) malloc(sizeof(struct CircularBuffer));
-	sample_pointer = (uint32_t*) malloc(32752*sizeof(uint32_t));
+	sample_pointer = (uint32_t*) malloc(32768*sizeof(uint32_t));
 
 	setupGPDMA();
 	//cBufferInit(samples, 32000);
@@ -295,7 +270,7 @@ static void setupHardware()
 
 static void sendSample()
 {
-	for (int i = 0; i < 4094; i = i + 64)
+	for (int i = 0; i < 4095; i = i + 64)
 	{
 		while (libusbdev_QueueSendDone() != 0)
 		{
@@ -377,7 +352,7 @@ int main(void)
 	samplingADC();
 	startSampling();
 	//USB send
-	sendSample();
+//	sendSample();
 
     // Force the counter to be placed into memory
     volatile static int i = 0 ;
