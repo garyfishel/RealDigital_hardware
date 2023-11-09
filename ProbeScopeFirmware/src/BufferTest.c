@@ -118,7 +118,7 @@ void setupADC()
 	LPC_ADCHS->DSCR_STS = (1 << 1)| 0;
 
 	// Select both positive and negative DC biasing for input 2
-	Chip_HSADC_SetACDCBias(LPC_ADCHS, 2, HSADC_CHANNEL_DCBIAS, HSADC_CHANNEL_NODCBIAS);
+	Chip_HSADC_SetACDCBias(LPC_ADCHS, 0, HSADC_CHANNEL_DCBIAS, HSADC_CHANNEL_NODCBIAS);
 
 	LPC_ADCHS->THR[0] = 0x000 << 0 | 0xFFF << 16;//Default
 	LPC_ADCHS->THR[1] = 0x000 << 0 | 0xFFF << 16;//Default
@@ -133,7 +133,7 @@ void setupADC()
 
 	/* Setup data format for 2's complement and update clock settings. This function
 	   should be called whenever a clock change is made to the HSADC */
-	Chip_HSADC_SetPowerSpeed(LPC_ADCHS, false);
+	Chip_HSADC_SetPowerSpeed(LPC_ADCHS, true);
 
 	//use two descriptors to be able to run at the full 80MSPS
 	/* Set descriptor 0 to take a measurement at every clock and branch to itself*/
