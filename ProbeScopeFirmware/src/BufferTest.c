@@ -24,6 +24,16 @@
 
 #include <cr_section_macros.h>
 
+
+
+//********** pins for GPIO components: ************//
+
+//uint8_t* MCU_SC_GAIN = LPC_GPIO_PORT->B[0][12];
+//uint8_t* MCU_SC_DC_n = LPC_GPIO_PORT->B[0][13];
+//uint8_t* MCU_SC_DC_p = LPC_GPIO_PORT->B[0][15];
+
+//********** Arrays for storing samples ***********//
+
 uint8_t sample_pointer0[16380];
 uint8_t sample_pointer1[16380];
 uint8_t sample_pointer2[16380];
@@ -253,6 +263,14 @@ static void setupHardware()
 	// Initializes GPIO
 	Chip_GPIO_Init(LPC_GPIO_PORT);
 	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, 3, 7);
+
+	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, 0, 12);
+	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, 0, 13);
+	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, 0, 15);
+
+	Chip_GPIO_SetPinState(LPC_GPIO_PORT, 0, 12, true);
+	Chip_GPIO_SetPinState(LPC_GPIO_PORT, 0, 13, true);
+	Chip_GPIO_SetPinState(LPC_GPIO_PORT, 0, 15, true);
 
 
 	// Initialize USB
