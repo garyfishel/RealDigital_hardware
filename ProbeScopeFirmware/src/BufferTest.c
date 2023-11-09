@@ -24,12 +24,14 @@
 
 #include <cr_section_macros.h>
 
-uint32_t* sample_pointer;
-
-//********** Circular Buffer header and global variables **********//
-#include "SampleBuffer.h"
-
-struct CircularBuffer* samples;
+uint8_t sample_pointer0[16380];
+uint8_t sample_pointer1[16380];
+uint8_t sample_pointer2[16380];
+uint8_t sample_pointer3[16380];
+//uint8_t sample_pointer4[16380];
+//uint8_t sample_pointer5[16380];
+//uint8_t sample_pointer6[16380];
+//uint8_t sample_pointer7[16380];
 
 //********** USB Rom header and variables **********//
 #include <stdio.h>
@@ -44,7 +46,7 @@ struct CircularBuffer* samples;
 #include "GPDMA.h"
 #define DMA_CH 7
 
-static GPDMA_vector DMA_List[8];
+static GPDMA_vector DMA_List[4];
 
 volatile uint32_t numsamples = 0;
 volatile bool unhandledReq = false;
@@ -167,9 +169,17 @@ void setupGPDMA()
 	LPC_GPDMA->CONFIG =   0x01;
 	while( !(LPC_GPDMA->CONFIG & 0x01) );
 
-	for (int i = 0; i < 8; i++) {
+	DMA_List[0].DstAddr = (uint32_t) sample_pointer0;
+	DMA_List[1].DstAddr = (uint32_t) sample_pointer1;
+	DMA_List[2].DstAddr = (uint32_t) sample_pointer2;
+	DMA_List[3].DstAddr = (uint32_t) sample_pointer3;
+//	DMA_List[4].DstAddr = (uint32_t) sample_pointer4;
+//	DMA_List[5].DstAddr = (uint32_t) sample_pointer5;
+//	DMA_List[6].DstAddr = (uint32_t) sample_pointer6;
+//	DMA_List[7].DstAddr = (uint32_t) sample_pointer7;
+
+	for (int i = 0; i < 4; i++) {
 		    DMA_List[i].SrcAddr = (uint32_t) &LPC_ADCHS->FIFO_OUTPUT[0];
-		    DMA_List[i].DstAddr = (uint32_t) (sample_pointer + 4096*i);
 		    DMA_List[i].NextLLI = (uint32_t)(&DMA_List[(i+1) % 8]);
 		    DMA_List[i].Control = (4095 << 0) |      // Transfersize (does not matter when flow control is handled by peripheral)
 		                           (0x0 << 12)  |          // Source Burst Size
@@ -208,23 +218,11 @@ void startSampling()
 	//start HSADC
 	Chip_HSADC_SWTrigger(LPC_ADCHS);
 
+	//start DMA
+	LPC_GPDMA->CH[DMA_CH].CONFIG = (0x1 << 0); // enable bit, 1 enable, 0 disable
 
-
-	for (int i = 0; i < 8; i++) {
-
-			LPC_GPDMA->CH[DMA_CH].DESTADDR = sample_pointer + 4095*i;
-			GPDMA_ADC2Mtransfer(sample_pointer + 4095*i, 1);
-
-			//start DMA
-			LPC_GPDMA->CH[DMA_CH].CONFIG = (0x1 << 0); // enable bit, 1 enable, 0 disable
-
-			// wait for DMA transfer to complete
-			while(LPC_GPDMA->INTTCSTAT == 1);
-
-
-	}
-
-
+	// wait for DMA transfer to complete
+	while(LPC_GPDMA->INTTCSTAT == 1);
 
 	Chip_HSADC_FlushFIFO(LPC_ADCHS);
 	uint32_t sts = Chip_HSADC_GetFIFOLevel(LPC_ADCHS);
@@ -255,14 +253,12 @@ static void setupHardware()
 	Chip_GPIO_Init(LPC_GPIO_PORT);
 	Chip_GPIO_SetPinDIROutput(LPC_GPIO_PORT, 3, 7);
 
+
 	// Initialize USB
-//	setupUSB();
+	setupUSB();
 
 	// Initialize ADC
 	setupADC();
-
-	//samples = (struct CircularBuffer*) malloc(sizeof(struct CircularBuffer));
-	sample_pointer = (uint32_t*) malloc(32768*sizeof(uint32_t));
 
 	setupGPDMA();
 	//cBufferInit(samples, 32000);
@@ -270,16 +266,17 @@ static void setupHardware()
 
 static void sendSample()
 {
-	for (int i = 0; i < 4095; i = i + 64)
-	{
-		while (libusbdev_QueueSendDone() != 0)
-		{
-			//wait for last send to finish
-			__WFI();
-		}
-		//send data point
-		libusbdev_QueueSendReq((uint8_t *) (sample_pointer + i), 64);
-	}
+	while (libusbdev_QueueSendDone() != 0) {};
+	while (libusbdev_QueueSendReq(sample_pointer0, 16380) != 0) {};
+
+	while (libusbdev_QueueSendDone() != 0){};
+	while (libusbdev_QueueSendReq(sample_pointer1, 16380) != 0){};
+
+	while (libusbdev_QueueSendDone() != 0){};
+	while (libusbdev_QueueSendReq(sample_pointer2, 16380) != 0){};
+
+	while (libusbdev_QueueSendDone() != 0){};
+	while (libusbdev_QueueSendReq(sample_pointer3, 16380) != 0){};
 }
 
 void samplingADC(void)
@@ -352,7 +349,7 @@ int main(void)
 	samplingADC();
 	startSampling();
 	//USB send
-//	sendSample();
+	sendSample();
 
     // Force the counter to be placed into memory
     volatile static int i = 0 ;
