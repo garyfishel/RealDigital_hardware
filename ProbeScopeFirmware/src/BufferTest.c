@@ -71,7 +71,8 @@ void setupADC()
 	Chip_USB0_Init();
 	Chip_Clock_SetDivider(CLK_IDIV_A,CLKIN_USBPLL,2); //480 MHz -> 240 MHz
 	Chip_Clock_SetDivider(CLK_IDIV_B,CLKIN_IDIVA,3);  //240 MHz -> 80 MHz
-	Chip_Clock_SetBaseClock(CLK_BASE_ADCHS, CLKIN_IDIVB, true, false); /* Source ADHCS base clock from DIV_B */
+	Chip_Clock_SetDivider(CLK_IDIV_C,CLKIN_IDIVB,2); //480 MHz -> 240 MHz
+	Chip_Clock_SetBaseClock(CLK_BASE_ADCHS, CLKIN_IDIVC, true, false); /* Source ADHCS base clock from DIV_B */
 	freqHSADC = Chip_HSADC_GetBaseClockRate(LPC_ADCHS);
 	Chip_Clock_EnableOpts(CLK_MX_ADCHS, true, true, 1);
 	Chip_Clock_Enable(CLK_ADCHS);
